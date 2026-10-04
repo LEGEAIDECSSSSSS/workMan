@@ -10,8 +10,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -19,6 +23,9 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private UserService userService;
@@ -33,11 +40,14 @@ class UserServiceTest {
                 .role("CUSTOMER")
                 .build();
 
+        when(passwordEncoder.encode("password123"))
+                .thenReturn("hashedPassword");
+
         User savedUser = User.builder()
                 .id(1L)
                 .name("John Doe")
                 .email("john@example.com")
-                .password("password123")
+                .password("hashedPassword")
                 .role(Role.CUSTOMER)
                 .isActive(true)
                 .build();
@@ -63,5 +73,43 @@ class UserServiceTest {
         assertThat(userPassedToRepository.getEmail()).isEqualTo("john@example.com");
         assertThat(userPassedToRepository.getRole()).isEqualTo(Role.CUSTOMER);
         assertThat(userPassedToRepository.isActive()).isTrue();
+
+        assertThat(userPassedToRepository.getPassword())
+                .isEqualTo("hashedPassword");
+
+        assertThat(userPassedToRepository.getPassword())
+                .isNotEqualTo("password123");
+
+        verify(passwordEncoder).encode("password123");
+    }
+
+    @Test
+    void shouldNotRegisterUserWhenEmailAlreadyExists() {
+
+        RegisterRequest request = RegisterRequest.builder()
+                .name("John Doe")
+                .email("john@example.com")
+                .password("password123")
+                .role("CUSTOMER")
+                .build();
+
+        User existingUser = User.builder()
+                .id(1L)
+                .name("Jane Doe")
+                .email("john@example.com")
+                .password("existingPassword")
+                .role(Role.CUSTOMER)
+                .isActive(true)
+                .build();
+
+        when(userRepository.findByEmail("john@example.com"))
+                .thenReturn(Optional.of(existingUser));
+
+        assertThatThrownBy(() -> userService.register(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Email is already registered");
+
+        verify(userRepository, never()).save(any(User.class));
     }
 }
+
