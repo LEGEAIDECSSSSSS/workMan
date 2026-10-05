@@ -1,6 +1,6 @@
 package com.workman.service;
 
-import com.workman.dto.RegisterRequest;
+import com.workman.dto.request.RegisterRequest;
 import com.workman.model.Role;
 import com.workman.model.User;
 import com.workman.repository.UserRepository;
